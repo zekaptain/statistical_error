@@ -1,0 +1,316 @@
+---
+title: "Pool-seq variation model"
+author: "zoe elkins"
+format: html
+editor: visual
+---
+
+## Pool-seq variance
+
+The following code adapts the analysis performed by Rode et al. 2018. Whereas their analysis was made for haploid data, the following code works for diploid data.
+
+> Nicolas Rode, Yan Holtz, Karine Loridon, Sylvain Santoni, Joelle Ronfort, et al.. How to optimize the precision of allele and haplotype frequency estimates using pooled-sequencing data.. Molecular Ecology Resources, Wiley/Blackwell, 2018, 18 (2), pp.194-203. ff10.1111/1755-0998.12723ff. ffhal-02621308
+
+#### Equation 9 function
+
+```{r}
+#| echo: false
+
+ratioSDpoolSDind <- function(x,
+                             alpha=alphai,
+                             lambdapool=lambdapooli,
+                             CV=CVi,
+                             Nind=Nindi,
+                             LambdaInd=LambdaIndi){
+  
+  valpool = (
+    1 + CV^2 * 
+      ((2*x-1)/(2*x)) *
+      (1-(1+lambdapool*(1+alpha))/lambdapool^2) +
+      (2*x-1)*(1+lambdapool*(1+alpha)) /
+      lambdapool^2
+    )/(2*x)
+  
+  valind = (1 +(1+LambdaInd*(1+alphai))/LambdaInd^2)/(2*Nind)
+  
+  val = sqrt(valpool/valind)
+  
+  return(val)
+  
+}
+
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+#### Vstep 1-3
+
+Run simulations and establish functions for estimating variance in allele frequency estimates due to sampling variance, unequal individual contributions to the DNA pool, and sequencing variance.
+
+##### Function to sample total number of reads
+
+```{r}
+#| echo: false
+
+
+## Simulation parametrized using the mean of the Poisson law that generates the truncated Poisson
+rtpois <- function(n, lambda=5) {
+  qpois(runif(n, dpois(0, lambda), 1), lambda)
+  }
+
+## Zero truncated negative binomial
+rtnbinom <- function(n, lambda=5, sdlambda=1.00001) {
+  qnbinom(runif(n,
+                dnbinom(0, size=lambda/(sdlambda-1), mu=lambda),
+                1
+                ),
+          size=lambda/(sdlambda-1),mu=lambda
+          )
+  }
+```
+
+##### Function to compute the proportion of reads with the reference allele within the pool of reads
+
+```{r}
+#| echo: false
+
+## Standard deviation for the mass per individual sample (e.g. mg)
+
+sig1 <- 0.1
+## Standard deviation for the DNA yield per mass unit (e.g. ng DNA / mg mass)
+sig2 <- 0.01
+
+## seed: seed used to initialize the random number generator
+## p: frequency of the reference allele
+## N: total number of individuals sampled
+## mu: average DNA yield for one individual
+## sigma1: Standard deviation for the mass per individual sample (e.g. mg)
+## sigma2: Standard deviation for the DNA yield per mass unit (e.g. ng DNA / mg mass)
+## lambdasim: average sequencing depth
+## sdlambdasim: multiplicative overdispersion (s) for the negative binomial as parametrize in Gautier et al 2013
+
+simsampunique <- 
+  function(seed, p, N, mu, sigma1=sig1, sigma2=sig2, ratio=1, lambdasim=5, sdlambdasim=1) {
+  
+  set.seed(seed)
+  ## Number of individuals of focal genotype in the sample
+  nsim <- rbinom(n=1,size=N, prob=p)
+  #nsim=6
+  ## Mass of each individual sample
+  if(nsim > 0 & nsim < N) {
+    ## Mean and variance for the mass recovered for each individual sample
+    ## Normal distribution
+    # Msim <- rnorm(N,mean=mu,sd=sigma1)
+    ## Gamma distribution
+    #Msim <- rgamma(N,shape=mu^2/sigma^2,scale=sigma^2/mu)
+    #Msim <- rgamma(N,shape=mu^2/sigma1^2,scale=sigma1^2/mu)
+    
+    ## Lognormal distribution
+    ## Mean and variance of the first lognormal equals to mu and sigma1^2
+    location1 = log(mu)-log(((sigma1/mu)^2)+1)/2
+    scale1 = sqrt(log(((sigma1/mu)^2)+1))
+    Msim <- rlnorm(N, meanlog = location1, sdlog = scale1)
+    
+    ## Mean and variance for DNA yield per mass unit
+    ## Mean and variance of the second lognormal
+    scale2 = sqrt(log(0.5*(sqrt(4*sigma2^2+1)+1)))
+    Yieldsim <- rlnorm(N, meanlog = 0, sdlog = scale2)
+    
+    ## Multiply the mass by the DNA yield per mass unit
+    Msim <- Msim*Yieldsim
+    
+    ## Sample the total number of reads
+    if(sdlambdasim==1){
+      ## Poisson distribution
+      Totreads <- rtpois(n=1,lambda=lambdasim)
+      
+    }else{
+      ## With neg binomial
+      Totreads <- rtnbinom(n=1, lambda=lambdasim, sdlambda=sdlambdasim)
+    }
+    
+    ## Proportion of focal genotype in the sample
+    if(sum(Msim)<=0|sum(Msim[1:nsim])<=0|sum(Msim[(nsim+1):N])<=0){
+      allelefreq <- NA
+    }else{
+      numfocalreads <- ifelse(sum(Msim[1:nsim]) <= 0,0,rbinom(n=1,size=Totreads,prob=sum(Msim[1:nsim])/sum(Msim)))
+      #print(c(seed,numfocalreads/Totreads))
+      allelefreq <- c(numfocalreads/Totreads)
+    }
+  }else{
+    allelefreq <- nsim/N
+  }
+  return(allelefreq)
+}
+
+```
+
+##### Function to compute the mean and standard deviation of the frequency of the reference allele across many samples
+
+```{r}
+#| echo: false
+
+
+## Function to parallelize over many replicates
+simsamp <- function(
+    p=0.5,
+    N=10,
+    mu,
+    sigma1=sig1,
+    sigma2=sig2,
+    lambdasim=5,
+    sdlambdasim=1,
+    nrep=10000) {
+  probvec <- sapply(1:nrep,
+                    simsampunique,
+                    mu=mu,
+                    p=p,
+                    N=N,
+                    lambdasim=lambdasim,
+                    sdlambdasim=sdlambdasim,
+                    sigma1=sigma1,
+                    sigma2=sigma2)
+  probvec
+  return(list(mean(na.omit(probvec)),sd(na.omit(probvec))))
+}
+
+## Test with one example
+simsamp(mu=0.1)
+```
+
+##### Simulations
+
+```{r}
+#| echo: false
+
+#simsamp(mu=1,nrep=10000)
+## To vectorize the simulations
+##sapply(musim,simsamp,p=0.1)
+
+
+#sdlambda=c(1,3)
+
+#lambda=c(20)
+
+
+simvarstep1to3 <- function(sdlambda=c(1), lambda=c(20, 50)){
+  
+  ## Coefficient of variation ranging from 0.1 to 1
+  musim <- 0.1/c(0.001,(1:10/10))
+  
+  ## Coefficient of variation ranging from 0.1 to 1
+  ## Mean and variance for the mass recovered for each individual sample
+  location1=log(musim)-log(((sig1/musim)^2)+1)/2
+  scale1=sqrt(log(((sig1/musim)^2)+1))
+  location1=log(musim)-(scale1^2)/2
+  
+  
+  ## Mean and variance for DNA yield per mass unit
+  scale2=sqrt(log(0.5*(sqrt(4*sig2^2+1)+1)))
+  scale=sqrt(scale1^2+scale2^2)
+  
+  ## Analytical formula based on logNormal resulting from the product of the first and second lognormal (see Note 1 at the bottom of Supp. Inf. S1 p4)
+  #vareq <- (exp(scale^2)-1)*exp(2*location1+scale^2)
+  #vareq2 <- (1/2)*(sqrt(4*sig2^2+1)+1)*((1/2)*(sqrt(4*sig2^2+1)+1)*(sig1^2+musim^2)-musim^2)
+  #vareq3 <- sig1^2*sig2^2+musim^2*sig2^2+((sig1^2)/2)*(sqrt(4*sig2^2+1)+1)
+  #data.frame(vareq,vareq2,vareq3)
+  
+  ## Compute CV to verify it is between 0.01 and 1
+  ##sqrt(vareq)/musim
+  
+  ## Focal frequency
+  prob <- c(0.01,0.1, 0.25,0.5)
+  ## Sample size
+  Ntot <- c(20,200)
+  
+  
+  ## Creates empty dataframe
+  simquantsd <- data.frame(row.names=c("prob","N","mu","mean","sd","lambda","sdlambda","sig1","sig2"))
+  
+  
+  ## Loop to compute the frequency of the reference allele in the pool of reads for each combination of parameters
+  for (Ntotsim in Ntot){
+    for (lambdasim in lambda){
+      for (sdlambdasim in sdlambda){
+        for (probsim in prob){
+          print(c(Ntotsim,lambdasim,sdlambdasim,probsim))
+          sim <- sapply(musim,
+                        simsamp,
+                        p=probsim,
+                        N=Ntotsim,
+                        lambdasim=lambdasim,
+                        sdlambdasim=sdlambdasim)
+          
+          sim <- matrix(unlist(sim),ncol=2,byrow=T)
+          simquantsd <- rbind(simquantsd,
+                              cbind(rep(probsim,length(musim)),
+                                    rep(Ntotsim,length(musim)),
+                                    musim,
+                                    sim,
+                                    rep(lambdasim,length(musim)),
+                                    rep(sdlambdasim,length(musim)),
+                                    rep(sig1,length(musim)),
+                                    rep(sig2,length(musim))
+                                    )
+                              )
+          
+        }
+      }
+    }
+  }
+  
+  simquantsd <- as.data.frame(simquantsd)
+  colnames(simquantsd) <- c(
+    "prob","N","mu","mean","sd","lambda","sdlambda","sig1","sig2"
+    )
+  
+  ## Analytical formula based on logNormal resulting from the product of the first and second lognormal (see Note 1 at the bottom of Supp. Inf. S1 p4)
+  simquantsd$location1 <- log(simquantsd$mu) -
+    log(((simquantsd$sig1/simquantsd$mu)^2)+1) / 2
+  
+  simquantsd$scale1 <- sqrt(log(((simquantsd$sig1/simquantsd$mu)^2)+1))
+  
+  simquantsd$scale2 <- sqrt(log(0.5*(sqrt(4*simquantsd$sig2^2+1)+1)))
+  
+  simquantsd$scale <- sqrt(simquantsd$scale1^2+simquantsd$scale2^2)
+  
+  ## Compute the variance in individual contribution to the DNA pool
+  simquantsd$vareq <- (exp(simquantsd$scale^2) - 1) *
+    exp(2*simquantsd$location1+simquantsd$scale^2)
+  
+  ## Compute the coeffcicent of variation of individual contribution to the DNA pool
+  simquantsd$CV <- sqrt(simquantsd$vareq)/simquantsd$mu
+  
+  
+  ## Expectation for 1/r (i.e. 1 over the total number of reads at a given position, provided that at least one read has been sequenced)
+  ## See Eq 1 p1 in Supp. Inf. of Gautier et al 2013
+  simquantsd$lambdavar <- (simquantsd$lambda+simquantsd$sdlambda) /
+    simquantsd$lambda^2
+  
+  ## Using the analytical approximation (see V_(step1-2) Supp. Inf. p4)
+  simquantsd$approx <- sqrt(
+    (simquantsd$prob * (1-simquantsd$prob)/simquantsd$N) *
+      (
+        1 + ((simquantsd$N-1) * (1-simquantsd$lambdavar) * (simquantsd$CV)^2) / 
+         simquantsd$N + ((simquantsd$N-1)*simquantsd$lambdavar)
+       )
+    )
+  
+  
+  
+  ## Allele frequencies ad factors or a as numeric variables
+  simquantsd$probnum <- simquantsd$prob
+  simquantsd$prob <- as.factor(simquantsd$prob)
+  simquantsd$frequency <- factor(simquantsd$prob,
+                                 levels=sort(levels(simquantsd$prob),decreasing = T)
+                                 )
+  
+  simquantsd$color <- as.factor(simquantsd$prob)
+  
+  #head(simquantsd)
+  head(simquantsd[simquantsd$N==Ntot[1],])
+  
+  return(simquantsd)
+  
+}
+```
