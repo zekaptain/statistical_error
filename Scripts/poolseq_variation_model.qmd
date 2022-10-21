@@ -11,6 +11,15 @@ The following code adapts the analysis performed by Rode et al. 2018. Whereas th
 
 > Nicolas Rode, Yan Holtz, Karine Loridon, Sylvain Santoni, Joelle Ronfort, et al.. How to optimize the precision of allele and haplotype frequency estimates using pooled-sequencing data.. Molecular Ecology Resources, Wiley/Blackwell, 2018, 18 (2), pp.194-203. ff10.1111/1755-0998.12723ff. ffhal-02621308
 
+Load dependencies
+
+```{r}
+#| echo: false
+
+library(tidyverse)
+library(ggplot2)
+```
+
 #### Equation 9 function
 
 ```{r}
