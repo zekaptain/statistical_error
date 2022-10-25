@@ -1,0 +1,75 @@
+---
+title: "Pool-seq variation model"
+author: "zoe elkins"
+format:
+  pdf:
+    geometry:
+      - top = 1.0in
+      - left = 1.5in
+      - right = 1.0in
+      - bottom = 1.0in
+    fontfamily: ebgaramond
+    fontsize: 12pt
+    linestretch: 2
+editor: visual
+---
+
+## Simple pairwise comparisons
+
+Simulate a pairwise comparison between alleles at a single location without error.
+
+```{r}
+# load dependencies
+library(ggplot2)
+library(tidyverse)
+set.seed(172452)
+
+# establish pairwise parameters
+
+## allele frequencies for high and low populations
+popH <- 0.3
+popL <- 0.09
+## absolute difference in allele frequencies
+diff <- abs(popH - popL)
+## scale data logarithmically
+logdiff <- -log10(diff)
+## print pairwise comparison value -- 'true' value
+logdiff
+```
+
+Simulate a pairwise comparison between alleles at a single location with coverage error.
+
+```{r}
+# modulate pairwise comparison with coverage as a source of error
+
+## coverage
+cvg <- 10
+```
+
+Pull allele frequencies from a distribution for 'low' and 'high' poolseq populations and plot them.
+
+```{r}
+#| label: fig-allele-diffs
+#| fig-cap: Allele differences between exploring and non-exploring flies. 
+#| warning: false
+
+## the following code is from my professional website
+expl_freqs <- readRDS('expl-freqs.Rds')
+arm <- expl_freqs %>% 
+  filter(chrom=='2L') %>% 
+  slice(1:800)
+
+D <- (sample(400:600,800,replace = TRUE))/1000
+N <- (sample(300:600,800, replace = TRUE))/1000
+
+sampledata <- tibble(
+  "pos" = arm$pos,
+  "N" = N,
+  "D" = D
+)
+
+plt <- ggplot(data=sampledata, aes(pos/16)) + 
+  geom_line(aes(y = N, colour = "non-explorers")) +
+  geom_line(aes(y = D, colour = "explorers"))
+plt + labs(x = "Position (Mb)")
+```
