@@ -64,6 +64,12 @@ RMSEest <- sqrt( sum((AFest - AFtrue) ^ 2) / n)
 RMSEest
 ```
 
+In this case, with the code above, error introduced by variation in coverage would be evaluated via the magnitude of difference between theoretical and estimated RMSE values.
+
+| Tilk, Susanne, Alan Bergland, Aaron Goodman, Paul Schmidt, Dmitri Petrov, and Sharon Greenblum. 2019. \"Accurate Allele Frequencies from Ultra-Low Coverage Pool-Seq Samples in Evolve-and-Resequence Experiments.\" *G3*  9 (12): 4159--68.
+
+### Coverage and pairwise allele frequency comparisons
+
 Simulate a pairwise comparison between alleles at a single location with coverage error.
 
 ```{r}
