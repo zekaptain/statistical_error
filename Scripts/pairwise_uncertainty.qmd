@@ -37,13 +37,37 @@ logdiff <- -log10(diff)
 logdiff
 ```
 
-Simulate a pairwise comparison between alleles at a single location with coverage error.
+### Estimating 'effective coverage'
+
+A simulated calculation of coverage using the math detailed in Tilk et al. 2019. In other words, my own miniature HAF-pipe functions. Our variable `cvg_e` is the 'theoretical coverage at which binomial sampling of reads would be expected to contain the observed amount of error from estimated frequencies.' Put another way, the estimated and theoretical root mean squared error (RMSE) rates will equal each other under 'effective coverage.'
 
 ```{r}
 # modulate pairwise comparison with coverage as a source of error
 
-## coverage
-cvg <- 10
+# n is the number of sites, which in our case is just one
+n <- 1
+
+## estimated and true allele frequencies at one site
+AFtrue <- rbinom(100,100,0.38) / 100
+AFest <- rbinom(100,100,0.43) / 100
+
+## effective coverage -- Tilk et al. 2019
+cvg_e <- sum(AFtrue * (1 - AFtrue)) / sum((AFest - AFtrue) ^ 2)
+cvg_e
+
+## theoretical root mean squared error
+RMSEthe <- sqrt( sum(AFtrue * (1 - AFtrue)) / (cvg_e * n) )
+RMSEthe
+
+## estimated RMSE
+RMSEest <- sqrt( sum((AFest - AFtrue) ^ 2) / n)
+RMSEest
+```
+
+Simulate a pairwise comparison between alleles at a single location with coverage error.
+
+```{r}
+
 ```
 
 Pull allele frequencies from a distribution for 'low' and 'high' poolseq populations and plot them.
