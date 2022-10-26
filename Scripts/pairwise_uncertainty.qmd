@@ -1,6 +1,6 @@
 ---
-title: "Pool-seq variation model"
-author: "zoe elkins"
+title: "Pool-seq uncertainty analysis"
+author: "Z. Forrest Elkins"
 format:
   pdf:
     geometry:
@@ -8,7 +8,10 @@ format:
       - left = 1.5in
       - right = 1.0in
       - bottom = 1.0in
-    fontfamily: ebgaramond
+    fontfamily: libertinus
+    fontfamilyoptions: 
+      - osf
+      - p
     fontsize: 12pt
     linestretch: 2
 editor: visual
@@ -75,6 +78,8 @@ Simulate a pairwise comparison between alleles at a single location with coverag
 ```{r}
 
 ```
+
+### Simple plot of random allele frequencies
 
 Pull allele frequencies from a distribution for 'low' and 'high' poolseq populations and plot them.
 
