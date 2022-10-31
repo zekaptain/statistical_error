@@ -9,7 +9,6 @@ format:
       - right = 1.0in
       - bottom = 1.0in
     fontfamily: ebgaramond
-    fontfamilyoptions: 
     fontsize: 12pt
     linestretch: 2
 editor: visual

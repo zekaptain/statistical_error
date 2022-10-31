@@ -24,6 +24,8 @@ Simulate a pairwise comparison between alleles at a single location without erro
 # load dependencies
 library(ggplot2)
 library(tidyverse)
+library(purrr)
+library(cowplot)
 set.seed(172452)
 ```
 
@@ -89,12 +91,77 @@ In this case, with the code above, error introduced by variation in coverage wou
 ```
 ### Coverage and pairwise allele frequency comparisons
 
-Simulate a pairwise comparison between alleles at a single location with coverage error.
+Simulate a pairwise comparison between alleles at a single location with coverage error. To do this, we use a random binomial distribution that takes in coverage and true allele frequency and outputs the estimated allele frequency.
 
+```{=tex}
+\begin{spacing}{1}
+```
 ```{r}
+# how to simulate coverage
+## rbinom(1, cvg, AFtrue) / cvg
+## output is estimated AF
 
+cvg <- 20
+trueAF <- 0.43
+
+estAF <- rbinom(1,cvg,trueAF) / cvg
+estAF
 ```
 
+```{=tex}
+\end{spacing}
+```
+Function that calculates estimated allele frequency when it is given coverage and true allele frequency:
+
+```{=tex}
+\begin{spacing}{1}
+```
+```{r}
+# function calculating estimated allele frequency
+estAF <- function(cvg,trueAF){
+  est <- rbinom(1,cvg,trueAF) / cvg
+  return(est)
+}
+```
+
+```{=tex}
+\end{spacing}
+```
+Now, we can scale our code and plot the results:
+
+```{=tex}
+\begin{spacing}{1}
+```
+```{r}
+#| label: fig-allele-covg
+#| fig-cap: Variability in allele frequency estimations due to coverage. 
+#| warning: false
+
+# run this n times, scale up 
+n <- 1000
+tru <- 0.43
+cvg <- sample(2:150,n,replace = TRUE)
+af <- tibble(
+  "cvg" = cvg,
+  "trueAF" = rep(tru,times=n)
+)
+
+af$estAF <- af %>% pmap(estAF) %>% unlist()
+
+# plot estimated allele frequency by coverage
+plt <- af %>% ggplot(aes(x = estAF, y = cvg)) +
+  geom_point(alpha = 0.15,colour="red") +
+  geom_smooth(method = "gam", colour = "red") +
+  geom_vline(xintercept=tru, size = 0.8,linetype = "dashed") +
+  labs(x = "Estimated allele frequency", y = "Coverage") +
+  annotate("label",x = tru, y = -50, label = "True allele frequency") +
+  theme_cowplot()
+plt
+```
+
+```{=tex}
+\end{spacing}
+```
 ### Simple plot of random allele frequencies
 
 Pull allele frequencies from a distribution for 'low' and 'high' poolseq populations and plot them.
