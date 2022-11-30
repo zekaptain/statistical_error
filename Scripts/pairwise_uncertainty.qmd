@@ -1,5 +1,6 @@
 ---
-title: "Pool-seq uncertainty analysis"
+title: "CHAPTER 4"
+subtitle: "Pool-seq uncertainty analysis"
 author: "Z. Forrest Elkins"
 format:
   pdf:
@@ -13,9 +14,15 @@ format:
 editor: visual
 ---
 
-## Simple pairwise comparisons
+## Background
 
-Simulate a pairwise comparison between alleles at a single location without error.
+Pooled sequencing has become a cost-effective and accurate method of DNA sequencing. As a result, we lose individual genetic data identifiers. The sequenced DNA are a representative sample of the pool instead of the individual. While this method reduces sequencing cost without sacrificing accurate allele & haplotype frequency reads, it does introduce extra sources of statistical error. Since the DNA reads are a representative sample, we wind up with varying amounts of sequenced DNA reads along the genome. In addition, the resulting allele & haplotype frequencies are influenced by the formation of the sample.
+
+Here, I establish a novel method of statistical error estimation due to varying amounts of coverage. Coverage is defined as the number of reads at a given location along the genome. Due to the law of large numbers, a higher sequencing coverage value leads to a more accurate allele estimation at that loci.
+
+### Simple pairwise comparisons
+
+Simulate a pairwise comparison between alleles at a single location without error. Here, calculate the absolute allele frequency difference between segregated bulks. The allele frequencies for the 'high' and 'low' bulks are assumed to be true -- i.e., there is no error in allele frequency estimation.
 
 ```{=tex}
 \begin{spacing}{1}
@@ -49,6 +56,8 @@ logdiff
 ### Estimating 'effective coverage'
 
 A simulated calculation of coverage using the math detailed in Tilk et al. 2019. In other words, my own miniature HAF-pipe functions. Our variable `cvg_e` is the 'theoretical coverage at which binomial sampling of reads would be expected to contain the observed amount of error from estimated frequencies.' Put another way, the estimated and theoretical root mean squared error (RMSE) rates will equal each other under 'effective coverage.'
+
+This method provides a level of sequencing coverage that researchers should aim for in their genetic data to minimize error in their observed allele frequencies. It does not give an estimation of that error as a function of coverage.
 
 ```{=tex}
 \begin{spacing}{1}
@@ -91,7 +100,9 @@ In this case, with the code above, error introduced by variation in coverage wou
 ```
 ### Coverage and pairwise allele frequency comparisons
 
-Simulate a pairwise comparison between alleles at a single location with coverage error. To do this, we use a random binomial distribution that takes in coverage and true allele frequency and outputs the estimated allele frequency.
+The following is a novel method of estimating error as a function of coverage. Simulate a pairwise comparison between alleles at a single location with coverage error. To do this, we use a random binomial distribution that takes in coverage and true allele frequency and outputs the estimated allele frequency.
+
+First, we simulate a single allele frequency estimation given coverage and true allele frequency:
 
 ```{=tex}
 \begin{spacing}{1}
@@ -111,7 +122,7 @@ estAF
 ```{=tex}
 \end{spacing}
 ```
-Function that calculates estimated allele frequency when it is given coverage and true allele frequency:
+Next, we establish a function that calculates estimated allele frequency when it is given coverage and true allele frequency:
 
 ```{=tex}
 \begin{spacing}{1}
@@ -127,7 +138,7 @@ estAF <- function(cvg,trueAF){
 ```{=tex}
 \end{spacing}
 ```
-Now, we can scale our code and plot the results:
+Finally, we can scale our code and plot the results:
 
 ```{=tex}
 \begin{spacing}{1}
@@ -151,7 +162,7 @@ af$estAF <- af %>% pmap(estAF) %>% unlist()
 # plot estimated allele frequency by coverage
 plt <- af %>% ggplot(aes(x = estAF, y = cvg)) +
   geom_point(alpha = 0.15,colour="red") +
-  geom_smooth(method = "gam", colour = "red") +
+  geom_smooth(method = "gam", colour = "red",se=FALSE) +
   geom_vline(xintercept=tru, size = 0.8,linetype = "dashed") +
   labs(x = "Estimated allele frequency", y = "Coverage") +
   annotate("label",x = tru, y = -50, label = "True allele frequency") +
@@ -162,6 +173,8 @@ plt
 ```{=tex}
 \end{spacing}
 ```
+We can see the level of coverage and its effect on allele frequency estimation in the plot above.
+
 ### Simple plot of random allele frequencies
 
 Pull allele frequencies from a distribution for 'low' and 'high' poolseq populations and plot them.
